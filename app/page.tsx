@@ -2,7 +2,17 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Smartphone, Package, TrendingUp, TrendingDown, ShoppingCart, Activity, Settings, FileText } from "lucide-react"
+import {
+  Smartphone,
+  Package,
+  TrendingUp,
+  TrendingDown,
+  ShoppingCart,
+  Activity,
+  Settings,
+  FileText,
+  User,
+} from "lucide-react"
 
 const stats = [
   {
@@ -31,6 +41,15 @@ const stats = [
     icon: Package,
     color: "text-purple-600",
     bgColor: "bg-purple-100",
+  },
+  {
+    name: "Total Users",
+    value: "342",
+    change: "+32%",
+    changeType: "increase",
+    icon: User,
+    color: "text-cyan-600",
+    bgColor: "bg-cyan-100",
   },
   {
     name: "Active Services",

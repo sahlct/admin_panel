@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,102 +10,165 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Edit, ShoppingCart, Search, ImageIcon } from "lucide-react"
+import axios from "axios"
 
-const mobiles = [
-  {
-    id: 1,
-    model: "iPhone 15 Pro",
-    brand: "Apple",
-    imei: "352099001761481",
-    color: "Space Black",
-    variant: "256GB",
-    country: "USA",
-    battery: "100%",
-    purchasePrice: 850,
-    sellingPrice: 999,
-    addedDate: "2024-01-10",
-    soldDate: null,
-    status: "In Stock",
-    image: "/placeholder.svg?height=100&width=100",
-    notes: "Pristine condition, original packaging included",
-  },
-  {
-    id: 2,
-    model: "Galaxy S24 Ultra",
-    brand: "Samsung",
-    imei: "490154203237518",
-    color: "Titanium Gray",
-    variant: "512GB",
-    country: "South Korea",
-    battery: "100%",
-    purchasePrice: 700,
-    sellingPrice: 849,
-    addedDate: "2024-01-12",
-    soldDate: "2024-01-20",
-    status: "Sold",
-    image: "/placeholder.svg?height=100&width=100",
-    notes: "Minor scratch on back panel",
-  },
-  {
-    id: 3,
-    model: "Pixel 8 Pro",
-    brand: "Google",
-    imei: "358240051093832",
-    color: "Obsidian",
-    variant: "128GB",
-    country: "Vietnam",
-    battery: "100%",
-    purchasePrice: 600,
-    sellingPrice: 749,
-    addedDate: "2024-01-15",
-    soldDate: null,
-    status: "In Stock",
-    image: "/placeholder.svg?height=100&width=100",
-    notes: "",
-  },
-  {
-    id: 4,
-    model: "OnePlus 12",
-    brand: "OnePlus",
-    imei: "867530020553090",
-    color: "Flowy Emerald",
-    variant: "256GB",
-    country: "China",
-    battery: "100%",
-    purchasePrice: 550,
-    sellingPrice: 699,
-    addedDate: "2024-01-18",
-    soldDate: null,
-    status: "In Stock",
-    image: "/placeholder.svg?height=100&width=100",
-    notes: "Dual SIM model",
-  },
-]
+const apiUrl = process.env.NEXT_PUBLIC_API_URL as string;
+
+interface Mobile {
+  m02_id: number;
+  m02_model_name: string;
+  m02_brand: string;
+  m02_imei: string;
+  m02_country: string;
+  m02_color: string;
+  m02_varient: string;
+  m02_battery: string;
+  m02_purchase_price: string;
+  m02_selling_price: string;
+  m02_photos: string[];
+  m02_notes: string;
+  m02_status: string;
+  m02_m01_user_id: number | null;
+  m02_care_warrenty: string;
+  m02_purchase_date: string;
+  m02_selling_date: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ApiResponse {
+  status: string;
+  message: string;
+  data: {
+    mobiles: Mobile[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  };
+}
 
 export default function MobilesPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-  const [isSellDialogOpen, setIsSellDialogOpen] = useState(false)
-  const [selectedMobile, setSelectedMobile] = useState<any>(null)
-  const [isGeneratingBill, setIsGeneratingBill] = useState(false)
+  const [mobiles, setMobiles] = useState<Mobile[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isSellDialogOpen, setIsSellDialogOpen] = useState(false);
+  const [selectedMobile, setSelectedMobile] = useState<Mobile | null>(null);
+  const [isGeneratingBill, setIsGeneratingBill] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editMobile, setEditMobile] = useState<Mobile | null>(null);
+
+  useEffect(() => {
+    fetchMobiles();
+  }, []);
+
+  const fetchMobiles = async () => {
+    try {
+      const response = await axios.get<ApiResponse>(`${apiUrl}/mobiles`);
+      setMobiles(response.data.data.mobiles);
+    } catch (error) {
+      console.error("Error fetching mobiles:", error);
+    }
+  };
+
+  const handleAddMobile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      m02_model_name: formData.get("model") as string,
+      m02_brand: formData.get("brand") as string,
+      m02_imei: formData.get("imei") as string,
+      m02_country: formData.get("country") as string,
+      m02_color: formData.get("color") as string,
+      m02_varient: formData.get("variant") as string,
+      m02_battery: formData.get("battery") as string,
+      m02_purchase_price: formData.get("purchase-price") as string,
+      m02_selling_price: formData.get("selling-price") as string,
+      m02_notes: formData.get("notes") as string,
+      m02_photos: Array.from(formData.getAll("image") as unknown as FileList).map(file => file.name),
+      m02_status: "In Stock" as const,
+      m02_care_warrenty: "3 Month" as const,
+      m02_purchase_date: new Date().toISOString(),
+    };
+    try {
+      await axios.post(`${apiUrl}/mobiles`, data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setIsAddDialogOpen(false);
+      fetchMobiles();
+    } catch (error) {
+      console.error("Error adding mobile:", error);
+    }
+  };
+
+  const handleEditMobile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editMobile) return;
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      m02_model_name: formData.get("model") as string,
+      m02_brand: formData.get("brand") as string,
+      m02_imei: formData.get("imei") as string,
+      m02_country: formData.get("country") as string,
+      m02_color: formData.get("color") as string,
+      m02_varient: formData.get("variant") as string,
+      m02_battery: formData.get("battery") as string,
+      m02_purchase_price: formData.get("purchase-price") as string,
+      m02_selling_price: formData.get("selling-price") as string,
+      m02_notes: formData.get("notes") as string,
+      m02_photos: Array.from(formData.getAll("image") as unknown as FileList).map(file => file.name),
+      m02_status: formData.get("status") as string,
+      m02_care_warrenty: formData.get("care-warrenty") as string,
+      m02_purchase_date: formData.get("purchase-date") as string,
+    };
+    try {
+      await axios.put(`${apiUrl}/mobiles/${editMobile.m02_id}`, data, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setIsEditDialogOpen(false);
+      fetchMobiles();
+    } catch (error) {
+      console.error("Error editing mobile:", error);
+    }
+  };
+
+  const handleSellMobile = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedMobile) return;
+    const formData = new FormData(e.currentTarget);
+    const data = {
+      m02_status: "SOLD" as const,
+      m02_selling_date: formData.get("sale-date") as string,
+      m02_notes: formData.get("sale-notes") as string,
+    };
+    try {
+      await axios.put(`${apiUrl}/mobiles/${selectedMobile.m02_id}`, data);
+      setIsSellDialogOpen(false);
+      fetchMobiles();
+    } catch (error) {
+      console.error("Error selling mobile:", error);
+    }
+  };
 
   const filteredMobiles = mobiles.filter(
     (mobile) =>
-      mobile.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mobile.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mobile.imei.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mobile.color.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mobile.variant.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      mobile.m02_model_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mobile.m02_brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mobile.m02_imei.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mobile.m02_color.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mobile.m02_varient.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -121,98 +184,91 @@ export default function MobilesPage() {
               Add Mobile
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Mobile</DialogTitle>
               <DialogDescription>Add a new mobile device to your inventory.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <form onSubmit={handleAddMobile} className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="model">Model Name</Label>
-                  <Input id="model" placeholder="iPhone 15 Pro" />
+                  <Input id="model" name="model" placeholder="S24" />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="brand">Brand</Label>
-                  <Select>
+                  <Select name="brand">
                     <SelectTrigger>
                       <SelectValue placeholder="Select brand" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="apple">Apple</SelectItem>
                       <SelectItem value="samsung">Samsung</SelectItem>
+                      <SelectItem value="apple">Apple</SelectItem>
                       <SelectItem value="google">Google</SelectItem>
                       <SelectItem value="oneplus">OnePlus</SelectItem>
-                      <SelectItem value="xiaomi">Xiaomi</SelectItem>
+                      <SelectItem value="Xiaomi">Xiaomi</SelectItem>
+                      <SelectItem value="Others">Others</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="imei">IMEI Number</Label>
-                  <Input id="imei" placeholder="352099001761481" />
+                  <Input id="imei" name="imei" placeholder="354267930064073" />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="country">Country of Origin</Label>
-                  <Input id="country" placeholder="USA" />
+                  <Input id="country" name="country" placeholder="India" />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="color">Color</Label>
-                  <Input id="color" placeholder="Space Black" />
+                  <Input id="color" name="color" placeholder="Cream" />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="variant">Variant (Storage/RAM)</Label>
-                  <Input id="variant" placeholder="256GB" />
+                  <Input id="variant" name="variant" placeholder="8/256" />
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="battery">Battery Health</Label>
-                  <Input id="battery" placeholder="100%" />
+                  <Input id="battery" name="battery" placeholder="100" />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="image">Device Image</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="image" type="file" accept="image/*" />
+                    <Input id="image" name="image" type="file" accept="image/*" multiple />
                     <Button type="button" variant="outline" size="icon">
                       <ImageIcon className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="purchase-price">Purchase Price</Label>
-                  <Input id="purchase-price" type="number" placeholder="850" />
+                  <Input id="purchase-price" name="purchase-price" type="number" placeholder="36500" />
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="selling-price">Selling Price</Label>
-                  <Input id="selling-price" type="number" placeholder="999" />
+                  <Input id="selling-price" name="selling-price" type="number" placeholder="36500" />
                 </div>
               </div>
-
               <div className="grid gap-2">
                 <Label htmlFor="notes">Additional Notes</Label>
-                <Textarea id="notes" placeholder="Any additional information about the device..." />
+                <Textarea id="notes" name="notes" placeholder="Full Kit" />
               </div>
-            </div>
-            <DialogFooter>
-              <Button type="submit" onClick={() => setIsAddDialogOpen(false)}>
-                Add Mobile
-              </Button>
-            </DialogFooter>
+              <DialogFooter>
+                <Button type="submit">Add Mobile</Button>
+              </DialogFooter>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Search */}
       <Card>
         <CardContent className="p-4">
           <div className="relative">
@@ -227,7 +283,6 @@ export default function MobilesPage() {
         </CardContent>
       </Card>
 
-      {/* Mobile Table */}
       <Card>
         <CardHeader>
           <CardTitle>Mobile Inventory</CardTitle>
@@ -251,116 +306,110 @@ export default function MobilesPage() {
               </TableHeader>
               <TableBody>
                 {filteredMobiles.map((mobile) => (
-                  <TableRow key={mobile.id}>
+                  <TableRow key={mobile.m02_id}>
                     <TableCell>
                       <img
-                        src={mobile.image || "/placeholder.svg"}
-                        alt={mobile.model}
+                        src={mobile.m02_photos && mobile.m02_photos.length > 0 ? mobile.m02_photos[0] : "/placeholder.svg"}
+                        alt={mobile.m02_model_name}
                         className="w-10 h-10 object-cover rounded-md"
                       />
                     </TableCell>
                     <TableCell className="font-medium">
-                      <div>{mobile.model}</div>
-                      <div className="text-xs text-gray-500">{mobile.brand}</div>
+                      <div>{mobile.m02_model_name}</div>
+                      <div className="text-xs text-gray-500">{mobile.m02_brand}</div>
                     </TableCell>
-                    <TableCell>{mobile.imei}</TableCell>
-                    <TableCell>{mobile.variant}</TableCell>
-                    <TableCell>{mobile.color}</TableCell>
-                    <TableCell>${mobile.purchasePrice}</TableCell>
-                    <TableCell>${mobile.sellingPrice}</TableCell>
+                    <TableCell>{mobile.m02_imei}</TableCell>
+                    <TableCell>{mobile.m02_varient}</TableCell>
+                    <TableCell>{mobile.m02_color}</TableCell>
+                    <TableCell>₹{mobile.m02_purchase_price}</TableCell>
+                    <TableCell>₹{mobile.m02_selling_price}</TableCell>
                     <TableCell>
-                      <Badge variant={mobile.status === "In Stock" ? "default" : "secondary"}>{mobile.status}</Badge>
+                      <Badge variant={mobile.m02_status === "In Stock" ? "default" : "secondary"}>{mobile.m02_status}</Badge>
                     </TableCell>
-                    <TableCell>{new Date(mobile.addedDate).toLocaleDateString()}</TableCell>
+                    <TableCell>{new Date(mobile.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={async () => {
+                          const response = await axios.get<ApiResponse>(`${apiUrl}/mobiles/${mobile.m02_id}`);
+                          setEditMobile(response.data.data.mobiles[0]);
+                          setIsEditDialogOpen(true);
+                        }}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        {mobile.status === "In Stock" && (
+                        {mobile.m02_status === "In Stock" && (
                           <Dialog open={isSellDialogOpen} onOpenChange={setIsSellDialogOpen}>
                             <DialogTrigger asChild>
                               <Button variant="outline" size="sm" onClick={() => setSelectedMobile(mobile)}>
                                 <ShoppingCart className="h-4 w-4" />
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="sm:max-w-[500px]">
+                            <DialogContent className="max-h-[90vh] overflow-y-auto bg-white/80">
                               <DialogHeader>
                                 <DialogTitle>Sell Mobile & Generate Bill</DialogTitle>
                                 <DialogDescription>
-                                  Record a sale and generate bill for {selectedMobile?.model}
+                                  Record a sale and generate bill for {selectedMobile?.m02_model_name}
                                 </DialogDescription>
                               </DialogHeader>
-                              <div className="grid gap-4 py-4">
+                              <form onSubmit={handleSellMobile} className="grid gap-4 py-4">
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="grid gap-2">
                                     <Label htmlFor="customer-name">Customer Name</Label>
-                                    <Input id="customer-name" placeholder="John Doe" />
+                                    <Input id="customer-name" name="customer-name" placeholder="John Doe" />
                                   </div>
                                   <div className="grid gap-2">
                                     <Label htmlFor="customer-phone">Customer Phone</Label>
-                                    <Input id="customer-phone" placeholder="+1 234 567 8900" />
+                                    <Input id="customer-phone" name="customer-phone" placeholder="+1 234 567 8900" />
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                   <div className="grid gap-2">
                                     <Label htmlFor="sale-price">Sale Price</Label>
-                                    <Input id="sale-price" type="number" placeholder={selectedMobile?.sellingPrice} />
+                                    <Input id="sale-price" name="sale-price" type="number" placeholder={selectedMobile?.m02_selling_price} />
                                   </div>
                                   <div className="grid gap-2">
                                     <Label htmlFor="tax-rate">Tax Rate (%)</Label>
-                                    <Input id="tax-rate" type="number" placeholder="8" defaultValue="8" />
+                                    <Input id="tax-rate" name="tax-rate" type="number" placeholder="8" defaultValue="8" />
                                   </div>
                                 </div>
                                 <div className="grid gap-2">
                                   <Label htmlFor="sale-date">Sale Date</Label>
                                   <Input
                                     id="sale-date"
+                                    name="sale-date"
                                     type="date"
                                     defaultValue={new Date().toISOString().split("T")[0]}
                                   />
                                 </div>
                                 <div className="grid gap-2">
                                   <Label htmlFor="sale-notes">Sale Notes</Label>
-                                  <Textarea id="sale-notes" placeholder="Any notes about this sale..." />
+                                  <Textarea id="sale-notes" name="sale-notes" placeholder="Any notes about this sale..." />
                                 </div>
-
-                                {/* Bill Preview */}
                                 <div className="border rounded-lg p-4 bg-gray-50">
                                   <h4 className="font-medium mb-2">Bill Preview</h4>
                                   <div className="space-y-1 text-sm">
                                     <div className="flex justify-between">
                                       <span>Device Price:</span>
-                                      <span>${selectedMobile?.sellingPrice}</span>
+                                      <span>${selectedMobile?.m02_selling_price}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span>Tax (8%):</span>
-                                      <span>${((selectedMobile?.sellingPrice || 0) * 0.08).toFixed(2)}</span>
+                                     <span>${((parseFloat(selectedMobile?.m02_selling_price || "0") * 0.08).toFixed(2))}</span>
                                     </div>
                                     <div className="flex justify-between font-semibold border-t pt-1">
                                       <span>Total:</span>
-                                      <span>${((selectedMobile?.sellingPrice || 0) * 1.08).toFixed(2)}</span>
+                                      <span>${((parseFloat(selectedMobile?.m02_selling_price || "0") * 1.08).toFixed(2))}</span>
                                     </div>
                                   </div>
                                 </div>
-                              </div>
-                              <DialogFooter>
-                                <Button
-                                  type="submit"
-                                  onClick={() => {
-                                    setIsGeneratingBill(true)
-                                    // Simulate bill generation
-                                    setTimeout(() => {
-                                      setIsGeneratingBill(false)
-                                      setIsSellDialogOpen(false)
-                                      alert("Sale recorded and bill generated successfully!")
-                                    }, 2000)
-                                  }}
-                                  disabled={isGeneratingBill}
-                                >
-                                  {isGeneratingBill ? "Generating Bill..." : "Record Sale & Generate Bill"}
-                                </Button>
-                              </DialogFooter>
+                                <DialogFooter>
+                                  <Button
+                                    type="submit"
+                                    disabled={isGeneratingBill}
+                                  >
+                                    {isGeneratingBill ? "Generating Bill..." : "Record Sale & Generate Bill"}
+                                  </Button>
+                                </DialogFooter>
+                              </form>
                             </DialogContent>
                           </Dialog>
                         )}
@@ -373,6 +422,113 @@ export default function MobilesPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Mobile</DialogTitle>
+            <DialogDescription>Edit the details of the mobile device.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditMobile} className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="model">Model Name</Label>
+                <Input id="model" name="model" defaultValue={editMobile?.m02_model_name || ""} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="brand">Brand</Label>
+                <Select name="brand" defaultValue={editMobile?.m02_brand || ""}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="samsung">Samsung</SelectItem>
+                    <SelectItem value="apple">Apple</SelectItem>
+                    <SelectItem value="google">Google</SelectItem>
+                    <SelectItem value="oneplus">OnePlus</SelectItem>
+                    <SelectItem value="Xiaomi">Xiaomi</SelectItem>
+                    <SelectItem value="Others">Others</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="imei">IMEI Number</Label>
+                <Input id="imei" name="imei" defaultValue={editMobile?.m02_imei || ""} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="country">Country of Origin</Label>
+                <Input id="country" name="country" defaultValue={editMobile?.m02_country || ""} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="color">Color</Label>
+                <Input id="color" name="color" defaultValue={editMobile?.m02_color || ""} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="variant">Variant (Storage/RAM)</Label>
+                <Input id="variant" name="variant" defaultValue={editMobile?.m02_varient || ""} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="battery">Battery Health</Label>
+                <Input id="battery" name="battery" defaultValue={editMobile?.m02_battery || ""} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="image">Device Image</Label>
+                <div className="flex items-center gap-2">
+                  <Input id="image" name="image" type="file" accept="image/*" multiple />
+                  <Button type="button" variant="outline" size="icon">
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="purchase-price">Purchase Price</Label>
+                <Input id="purchase-price" name="purchase-price" type="number" defaultValue={editMobile?.m02_purchase_price || ""} />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="selling-price">Selling Price</Label>
+                <Input id="selling-price" name="selling-price" type="number" defaultValue={editMobile?.m02_selling_price || ""} />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="notes">Additional Notes</Label>
+              <Textarea id="notes" name="notes" defaultValue={editMobile?.m02_notes || ""} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select name="status" defaultValue={editMobile?.m02_status || "In Stock"}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="In Stock">In Stock</SelectItem>
+                    <SelectItem value="SOLD">SOLD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="care-warrenty">Care Warranty</Label>
+                <Input id="care-warrenty" name="care-warrenty" defaultValue={editMobile?.m02_care_warrenty || ""} />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="purchase-date">Purchase Date</Label>
+              <Input id="purchase-date" name="purchase-date" type="date" defaultValue={editMobile?.m02_purchase_date ? new Date(editMobile.m02_purchase_date).toISOString().split("T")[0] : ""} />
+            </div>
+            <DialogFooter>
+              <Button type="submit">Update Mobile</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }

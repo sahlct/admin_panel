@@ -24,6 +24,7 @@ const navigation = [
   { name: "Mobiles", href: "/dashboard/mobiles", icon: Smartphone },
   { name: "Accessories", href: "/dashboard/accessories", icon: Package },
   { name: "Services", href: "/dashboard/services", icon: Settings },
+  { name: "Users", href: "/dashboard/users", icon: User },
   { name: "Bills", href: "/dashboard/bills", icon: Receipt },
   { name: "Profit & Expense", href: "/dashboard/tracker", icon: TrendingUp },
   { name: "Reports", href: "/dashboard/reports", icon: FileText },
