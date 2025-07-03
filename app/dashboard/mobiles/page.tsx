@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Edit, ShoppingCart, Search, ImageIcon } from "lucide-react"
 import axios from "axios"
+import debounce from "lodash/debounce"
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL as string;
 
@@ -34,7 +35,7 @@ interface Mobile {
   m02_battery: string;
   m02_purchase_price: string;
   m02_selling_price: string;
-  m02_photos: string[];
+  m02_photos: string;
   m02_notes: string;
   m02_status: string;
   m02_m01_user_id: number | null;
@@ -68,23 +69,30 @@ export default function MobilesPage() {
   const [isGeneratingBill, setIsGeneratingBill] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editMobile, setEditMobile] = useState<Mobile | null>(null);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
   useEffect(() => {
     fetchMobiles();
   }, []);
 
-  const fetchMobiles = async () => {
+  const fetchMobiles = async (search?: string) => {
     try {
-      const response = await axios.get<ApiResponse>(`${apiUrl}/mobiles`);
+      const url = search ? `${apiUrl}/mobiles?search=${encodeURIComponent(search)}` : `${apiUrl}/mobiles`;
+      const response = await axios.get<ApiResponse>(url);
       setMobiles(response.data.data.mobiles);
     } catch (error) {
       console.error("Error fetching mobiles:", error);
     }
   };
 
+  const debouncedFetchMobiles = debounce((searchTerm: string) => {
+    fetchMobiles(searchTerm);
+  }, 500);
+
   const handleAddMobile = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const files = formData.getAll("image") as File[];
     const data = {
       m02_model_name: formData.get("model") as string,
       m02_brand: formData.get("brand") as string,
@@ -96,16 +104,17 @@ export default function MobilesPage() {
       m02_purchase_price: formData.get("purchase-price") as string,
       m02_selling_price: formData.get("selling-price") as string,
       m02_notes: formData.get("notes") as string,
-      m02_photos: Array.from(formData.getAll("image") as unknown as FileList).map(file => file.name),
-      m02_status: "In Stock" as const,
-      m02_care_warrenty: "3 Month" as const,
-      m02_purchase_date: new Date().toISOString(),
+      m02_photos: files.map(file => ({ url: URL.createObjectURL(file) })),
+      m02_status: formData.get("status") as string,
+      m02_care_warrenty: formData.get("care-warrenty") as string,
+      m02_purchase_date: formData.get("purchase-date") as string,
     };
     try {
       await axios.post(`${apiUrl}/mobiles`, data, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setIsAddDialogOpen(false);
+      setImagePreviews([]);
       fetchMobiles();
     } catch (error) {
       console.error("Error adding mobile:", error);
@@ -116,6 +125,7 @@ export default function MobilesPage() {
     e.preventDefault();
     if (!editMobile) return;
     const formData = new FormData(e.currentTarget);
+    const files = formData.getAll("image") as File[];
     const data = {
       m02_model_name: formData.get("model") as string,
       m02_brand: formData.get("brand") as string,
@@ -127,7 +137,7 @@ export default function MobilesPage() {
       m02_purchase_price: formData.get("purchase-price") as string,
       m02_selling_price: formData.get("selling-price") as string,
       m02_notes: formData.get("notes") as string,
-      m02_photos: Array.from(formData.getAll("image") as unknown as FileList).map(file => file.name),
+      m02_photos: files.length > 0 ? files.map(file => ({ url: URL.createObjectURL(file) })) : editMobile.m02_photos,
       m02_status: formData.get("status") as string,
       m02_care_warrenty: formData.get("care-warrenty") as string,
       m02_purchase_date: formData.get("purchase-date") as string,
@@ -202,10 +212,10 @@ export default function MobilesPage() {
                       <SelectValue placeholder="Select brand" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="samsung">Samsung</SelectItem>
-                      <SelectItem value="apple">Apple</SelectItem>
-                      <SelectItem value="google">Google</SelectItem>
-                      <SelectItem value="oneplus">OnePlus</SelectItem>
+                      <SelectItem value="Samsung">Samsung</SelectItem>
+                      <SelectItem value="Apple">Apple</SelectItem>
+                      <SelectItem value="Google">Google</SelectItem>
+                      <SelectItem value="Oneplus">OnePlus</SelectItem>
                       <SelectItem value="Xiaomi">Xiaomi</SelectItem>
                       <SelectItem value="Others">Others</SelectItem>
                     </SelectContent>
@@ -238,13 +248,33 @@ export default function MobilesPage() {
                   <Input id="battery" name="battery" placeholder="100" />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="image">Device Image</Label>
+                  <Label htmlFor="image">Device Images</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="image" name="image" type="file" accept="image/*" multiple />
+                    <Input
+                      id="image"
+                      name="image"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (files) {
+                          const previews = Array.from(files).map(file => URL.createObjectURL(file));
+                          setImagePreviews(previews);
+                        }
+                      }}
+                    />
                     <Button type="button" variant="outline" size="icon">
                       <ImageIcon className="h-4 w-4" />
                     </Button>
                   </div>
+                  {imagePreviews.length > 0 && (
+                    <div className="flex gap-2 mt-2">
+                      {imagePreviews.map((preview, index) => (
+                        <img key={index} src={preview} alt={`Preview ${index}`} className="w-20 h-20 object-cover rounded-md" />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -261,6 +291,29 @@ export default function MobilesPage() {
                 <Label htmlFor="notes">Additional Notes</Label>
                 <Textarea id="notes" name="notes" placeholder="Full Kit" />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select name="status">
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="IN_STOCK">IN_STOCK</SelectItem>
+                      <SelectItem value="UPCOMING">UPCOMING</SelectItem>
+                      <SelectItem value="SOLD">SOLD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="care-warrenty">Care Warranty</Label>
+                  <Input id="care-warrenty" name="care-warrenty" placeholder="3 Month" />
+                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="purchase-date">Purchase Date</Label>
+                <Input id="purchase-date" name="purchase-date" type="date" />
+              </div>
               <DialogFooter>
                 <Button type="submit">Add Mobile</Button>
               </DialogFooter>
@@ -276,7 +329,10 @@ export default function MobilesPage() {
             <Input
               placeholder="Search mobiles by model, brand, IMEI..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                debouncedFetchMobiles(e.target.value);
+              }}
               className="pl-10"
             />
           </div>
@@ -294,10 +350,8 @@ export default function MobilesPage() {
                 <TableRow>
                   <TableHead>Image</TableHead>
                   <TableHead>Model</TableHead>
-                  <TableHead>IMEI</TableHead>
                   <TableHead>Variant</TableHead>
-                  <TableHead>Color</TableHead>
-                  <TableHead>Purchase Price</TableHead>
+                  <TableHead>IMEI</TableHead>
                   <TableHead>Selling Price</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Added Date</TableHead>
@@ -309,7 +363,7 @@ export default function MobilesPage() {
                   <TableRow key={mobile.m02_id}>
                     <TableCell>
                       <img
-                        src={mobile.m02_photos && mobile.m02_photos.length > 0 ? mobile.m02_photos[0] : "/placeholder.svg"}
+                        src={mobile.m02_photos ? mobile.m02_photos : "/placeholder.svg"}
                         alt={mobile.m02_model_name}
                         className="w-10 h-10 object-cover rounded-md"
                       />
@@ -318,13 +372,14 @@ export default function MobilesPage() {
                       <div>{mobile.m02_model_name}</div>
                       <div className="text-xs text-gray-500">{mobile.m02_brand}</div>
                     </TableCell>
+                    <TableCell>
+                      <div>{mobile.m02_varient}</div>
+                      <div className="text-xs text-gray-500">{mobile.m02_color}</div>
+                    </TableCell>
                     <TableCell>{mobile.m02_imei}</TableCell>
-                    <TableCell>{mobile.m02_varient}</TableCell>
-                    <TableCell>{mobile.m02_color}</TableCell>
-                    <TableCell>₹{mobile.m02_purchase_price}</TableCell>
                     <TableCell>₹{mobile.m02_selling_price}</TableCell>
                     <TableCell>
-                      <Badge variant={mobile.m02_status === "In Stock" ? "default" : "secondary"}>{mobile.m02_status}</Badge>
+                      <Badge variant={mobile.m02_status === "IN_STOCK" ? "default" : "secondary"}>{mobile.m02_status}</Badge>
                     </TableCell>
                     <TableCell>{new Date(mobile.createdAt).toLocaleDateString()}</TableCell>
                     <TableCell>
@@ -336,7 +391,7 @@ export default function MobilesPage() {
                         }}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        {mobile.m02_status === "In Stock" && (
+                        {mobile.m02_status === "IN_STOCK" && (
                           <Dialog open={isSellDialogOpen} onOpenChange={setIsSellDialogOpen}>
                             <DialogTrigger asChild>
                               <Button variant="outline" size="sm" onClick={() => setSelectedMobile(mobile)}>
@@ -393,7 +448,7 @@ export default function MobilesPage() {
                                     </div>
                                     <div className="flex justify-between">
                                       <span>Tax (8%):</span>
-                                     <span>${((parseFloat(selectedMobile?.m02_selling_price || "0") * 0.08).toFixed(2))}</span>
+                                      <span>${((parseFloat(selectedMobile?.m02_selling_price || "0") * 0.08).toFixed(2))}</span>
                                     </div>
                                     <div className="flex justify-between font-semibold border-t pt-1">
                                       <span>Total:</span>
@@ -442,10 +497,10 @@ export default function MobilesPage() {
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="samsung">Samsung</SelectItem>
-                    <SelectItem value="apple">Apple</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="oneplus">OnePlus</SelectItem>
+                    <SelectItem value="Samsung">Samsung</SelectItem>
+                    <SelectItem value="Apple">Apple</SelectItem>
+                    <SelectItem value="Google">Google</SelectItem>
+                    <SelectItem value="Oneplus">OnePlus</SelectItem>
                     <SelectItem value="Xiaomi">Xiaomi</SelectItem>
                     <SelectItem value="Others">Others</SelectItem>
                   </SelectContent>
@@ -478,13 +533,33 @@ export default function MobilesPage() {
                 <Input id="battery" name="battery" defaultValue={editMobile?.m02_battery || ""} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="image">Device Image</Label>
+                <Label htmlFor="image">Device Images</Label>
                 <div className="flex items-center gap-2">
-                  <Input id="image" name="image" type="file" accept="image/*" multiple />
+                  <Input
+                    id="image"
+                    name="image"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (files) {
+                        const previews = Array.from(files).map(file => URL.createObjectURL(file));
+                        setImagePreviews(previews);
+                      }
+                    }}
+                  />
                   <Button type="button" variant="outline" size="icon">
                     <ImageIcon className="h-4 w-4" />
                   </Button>
                 </div>
+                {imagePreviews.length > 0 && (
+                  <div className="flex gap-2 mt-2">
+                    {imagePreviews.map((preview, index) => (
+                      <img key={index} src={preview} alt={`Preview ${index}`} className="w-20 h-20 object-cover rounded-md" />
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -504,12 +579,13 @@ export default function MobilesPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="status">Status</Label>
-                <Select name="status" defaultValue={editMobile?.m02_status || "In Stock"}>
+                <Select name="status" defaultValue={editMobile?.m02_status || "IN_STOCK"}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="In Stock">In Stock</SelectItem>
+                    <SelectItem value="IN_STOCK">IN_STOCK</SelectItem>
+                    <SelectItem value="UPCOMING">UPCOMING</SelectItem>
                     <SelectItem value="SOLD">SOLD</SelectItem>
                   </SelectContent>
                 </Select>
